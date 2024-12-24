@@ -57,6 +57,19 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         composable("login") {
             LoginScreen(navController)
         }
+        composable("home") {
+            HomeScreen(navController)
+        }
+        // These routes will be implemented later
+        composable("scan") {
+            // TODO: Implement scan screen
+        }
+        composable("history") {
+            // TODO: Implement history screen
+        }
+        composable("profile") {
+            // TODO: Implement profile screen
+        }
     }
 }
 
