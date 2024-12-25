@@ -15,6 +15,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 @Composable
 fun RegistrationScreen(navController: NavController) {
@@ -87,58 +89,53 @@ fun RegistrationScreen(navController: NavController) {
             Button(
                 onClick = {
                     if (email.isNotBlank() && password.isNotBlank() &&
-                        firstName.isNotBlank() && lastName.isNotBlank()) {
+                        firstName.isNotBlank() && lastName.isNotBlank()
+                    ) {
                         isLoading = true
                         val cleanEmail = email.trim().lowercase()
 
-                        auth.createUserWithEmailAndPassword(cleanEmail, password)
-                            .addOnCompleteListener { task ->
-                                scope.launch(Dispatchers.Main) {
-                                    if (task.isSuccessful) {
-                                        val userId = auth.currentUser?.uid
-                                        if (userId != null) {
-                                            val user = hashMapOf(
-                                                "firstName" to firstName.trim(),
-                                                "lastName" to lastName.trim(),
-                                                "email" to cleanEmail
-                                            )
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    auth.createUserWithEmailAndPassword(cleanEmail, password)
+                                        .await()
 
-                                            db.collection("users")
-                                                .document(userId)
-                                                .set(user)
-                                                .addOnSuccessListener {
-                                                    scope.launch(Dispatchers.Main) {
-                                                        Toast.makeText(
-                                                            context,
-                                                            "Registration successful!",
-                                                            Toast.LENGTH_LONG
-                                                        ).show()
-                                                        // Delay navigation slightly to ensure toast is visible
-                                                        kotlinx.coroutines.delay(1000)
-                                                        navController.navigate("login") {
-                                                            popUpTo("registration") { inclusive = true }
-                                                        }
-                                                    }
-                                                }
-                                                .addOnFailureListener { e ->
-                                                    Toast.makeText(
-                                                        context,
-                                                        "Error storing user data: ${e.message}",
-                                                        Toast.LENGTH_LONG
-                                                    ).show()
-                                                    isLoading = false
-                                                }
-                                        }
-                                    } else {
-                                        Toast.makeText(
-                                            context,
-                                            "Registration failed: ${task.exception?.message}",
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                        isLoading = false
+                                    val userId = auth.currentUser?.uid
+                                    if (userId != null) {
+                                        val user = hashMapOf(
+                                            "firstName" to firstName.trim(),
+                                            "lastName" to lastName.trim(),
+                                            "email" to cleanEmail
+                                        )
+
+                                        db.collection("users")
+                                            .document(userId)
+                                            .set(user)
+                                            .await()
                                     }
                                 }
+
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(
+                                        context,
+                                        "Registration successful!",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    navController.navigate("login") {
+                                        popUpTo("registration") { inclusive = true }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(
+                                        context,
+                                        "Registration failed: ${e.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    isLoading = false
+                                }
                             }
+                        }
                     } else {
                         Toast.makeText(
                             context,
@@ -149,26 +146,31 @@ fun RegistrationScreen(navController: NavController) {
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
+                    .height(50.dp),
+                enabled = !isLoading
             ) {
-                Text("Register")
-            }
-        }
-
-        Row(
-            modifier = Modifier.padding(top = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Already have an account?")
-            TextButton(
-                onClick = {
-                    navController.navigate("login") {
-                        popUpTo("registration") { inclusive = true }
-                    }
+                if (isLoading) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary)
+                } else {
+                    Text("Register")
                 }
+            }
+          }
+
+            Row(
+                modifier = Modifier.padding(top = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Login")
+                Text("Already have an account?")
+                TextButton(
+                    onClick = {
+                        navController.navigate("login") {
+                            popUpTo("registration") { inclusive = true }
+                        }
+                    }
+                ) {
+                    Text("Login")
+                }
             }
         }
     }
-}

@@ -46,7 +46,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
     ) {
         composable("splash") {
             SplashScreen(onSplashComplete = {
-                navController.navigate("registration") {
+                navController.navigate("login") {
                     popUpTo("splash") { inclusive = true }
                 }
             })
@@ -62,13 +62,13 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         }
         // These routes will be implemented later
         composable("scan") {
-            // TODO: Implement scan screen
+            ScanScreen(navController)
         }
         composable("history") {
             // TODO: Implement history screen
         }
         composable("profile") {
-            // TODO: Implement profile screen
+            ProfileScreen(navController)
         }
     }
 }

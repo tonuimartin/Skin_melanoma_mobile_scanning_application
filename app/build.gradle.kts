@@ -52,6 +52,22 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.navigation.runtime.ktx)
     implementation(libs.firebase.firestore.ktx)
+    // TensorFlow Lite
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
+
+    configurations.all {
+        exclude(group = "com.google.ai.edge.litert", module = "litert-api")
+        exclude(group = "com.google.ai.edge.litert", module = "litert")
+        exclude(group = "com.google.ai.edge.litert", module = "litert-support-api")
+    }
+
+    // Camera dependencies
+    implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+    implementation("androidx.camera:camera-view:1.3.1")
+
+    implementation(libs.litert)
+    implementation(libs.litert.support.api)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -65,4 +81,14 @@ dependencies {
 
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.auth.ktx)
+}
+android {
+    // ... other android configurations ...
+
+    packagingOptions {
+        pickFirst("lib/arm64-v8a/libtensorflowlite_jni.so")
+        pickFirst("lib/armeabi-v7a/libtensorflowlite_jni.so")
+        pickFirst("lib/x86/libtensorflowlite_jni.so")
+        pickFirst("lib/x86_64/libtensorflowlite_jni.so")
+    }
 }
