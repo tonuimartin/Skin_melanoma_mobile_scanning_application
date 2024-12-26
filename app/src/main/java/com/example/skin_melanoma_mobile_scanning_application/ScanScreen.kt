@@ -3,6 +3,7 @@ package com.example.skin_melanoma_mobile_scanning_application
 import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -15,11 +16,17 @@ import java.util.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import java.nio.charset.StandardCharsets
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +38,7 @@ fun ScanScreen(navController: NavController) {
     var imageSource by remember { mutableStateOf<ImageSource?>(null) }
     val context = LocalContext.current
     val classifier = remember { MelanomaClassifier(context) }
+    var isProcessing by remember { mutableStateOf(false) }
 
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -117,26 +125,50 @@ fun ScanScreen(navController: NavController) {
     }
 
     imageUri?.let { uri ->
-        ImagePreview(
-            imageUri = uri,
-            onConfirm = {
-                // Load the image and classify it
-                val bitmap = MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                val classification = classifier.classifyImage(bitmap)
+        if (!isProcessing) {
+            ImagePreview(
+                imageUri = uri,
+                onConfirm = {
+                    isProcessing = true
+                    try {
+                        // Load and classify the image
+                        val bitmap = MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                        Log.d("ScanScreen", "Image loaded successfully, starting classification")
+                        val classification = classifier.classifyImage(bitmap)
+                        Log.d("ScanScreen", "Classification complete: Malignant: ${classification.first}, Confidence: ${classification.second}")
 
-                navController.navigate(
-                    "scanResult/${URLEncoder.encode(uri.toString(), StandardCharsets.UTF_8.toString())}/${classification.first}/${classification.second}"
-                )
-            },
-            onRetake = {
-                imageUri = null
-                when (imageSource) {
-                    ImageSource.CAMERA -> showCamera = true
-                    ImageSource.GALLERY -> imagePickerLauncher.launch("image/*")
-                    null -> showSelectionDialog = true
+                        // Navigate to result screen
+                        navController.navigate(
+                            "scanResult/${URLEncoder.encode(uri.toString(), StandardCharsets.UTF_8.toString())}/${classification.first}/${classification.second}"
+                        )
+                    } catch (e: Exception) {
+                        Log.e("ScanScreen", "Error processing image: ${e.message}")
+                        Toast.makeText(
+                            context,
+                            "Error processing image: ${e.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        isProcessing = false
+                    }
+                },
+                onRetake = {
+                    imageUri = null
+                    when (imageSource) {
+                        ImageSource.CAMERA -> showCamera = true
+                        ImageSource.GALLERY -> imagePickerLauncher.launch("image/*")
+                        null -> showSelectionDialog = true
+                    }
                 }
+            )
+        } else {
+            // Show loading indicator while processing
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
             }
-        )
+        }
     }
 }
 

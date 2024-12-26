@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,17 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import androidx.room.Delete
-import coil.compose.rememberAsyncImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.*
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -38,26 +35,68 @@ fun ScanHistoryScreen(navController: NavController) {
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val db = remember { FirebaseFirestore.getInstance() }
+    val deleteJob = remember { mutableStateOf<Job?>(null) }
 
-    // Fetch scans when screen is loaded
-    LaunchedEffect(Unit) {
+    // Function to fetch scans
+    val fetchScans = suspend {
         val auth = FirebaseAuth.getInstance()
-        val db = FirebaseFirestore.getInstance()
+        val userId = auth.currentUser?.uid
+        if (userId != null) {
+            val querySnapshot = db.collection("scans")
+                .whereEqualTo("userId", userId)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .get()
+                .await()
 
-        try {
-            val userId = auth.currentUser?.uid
-            if (userId != null) {
-                val querySnapshot = db.collection("scans")
-                    .whereEqualTo("userId", userId)
-                    .orderBy("timestamp", Query.Direction.DESCENDING)
-                    .get()
-                    .await()
+            querySnapshot.documents.mapNotNull { doc ->
+                doc.toObject(ScanResult::class.java)
+            }
+        } else {
+            emptyList()
+        }
+    }
 
-                scans = querySnapshot.documents.mapNotNull { doc ->
-                    doc.toObject(ScanResult::class.java)
+    val deleteScan = remember {
+        { scan: ScanResult ->
+            deleteJob.value?.cancel()
+            deleteJob.value = CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    // Remove from local state immediately
+                    withContext(Dispatchers.Main) {
+                        scans = scans.filter { it.id != scan.id }
+                    }
+
+                    // Delete from Firebase
+                    db.collection("scans")
+                        .document(scan.id)
+                        .delete()
+                        .await()
+
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Scan deleted successfully", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    // If delete fails, refresh the list to restore state
+                    withContext(Dispatchers.Main) {
+                        scans = fetchScans()
+                        Toast.makeText(context, "Failed to delete scan: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            deleteJob.value?.cancel()
+        }
+    }
+
+    // Initial fetch of scans
+    LaunchedEffect(Unit) {
+        try {
+            scans = fetchScans()
             isLoading = false
         } catch (e: Exception) {
             error = "Error loading scan history: ${e.message}"
@@ -72,6 +111,17 @@ fun ScanHistoryScreen(navController: NavController) {
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(Icons.Default.ArrowBack, "Back")
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            navController.navigate("home") {
+                                popUpTo("home") { inclusive = false }
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Default.Home, contentDescription = "Home")
                     }
                 }
             )
@@ -113,26 +163,13 @@ fun ScanHistoryScreen(navController: NavController) {
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(vertical = 16.dp)
                 ) {
-                    items(scans) { scan ->
+                    items(
+                        items = scans,
+                        key = { it.id }
+                    ) { scan ->
                         ScanHistoryItem(
                             scan = scan,
-                            onDelete = {
-                                scope.launch {
-                                    try {
-                                        FirebaseFirestore.getInstance()
-                                            .collection("scans")
-                                            .document(scan.id)
-                                            .delete()
-                                            .await()
-
-                                        // Update local state after successful deletion
-                                        scans = scans.filter { it.id != scan.id }
-                                        Toast.makeText(context, "Scan deleted successfully", Toast.LENGTH_SHORT).show()
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Failed to delete scan: ${e.message}", Toast.LENGTH_LONG).show()
-                                    }
-                                }
-                            }
+                            onConfirmDelete = { deleteScan(scan) }
                         )
                     }
                 }
@@ -154,7 +191,7 @@ fun ScanHistoryScreen(navController: NavController) {
 @Composable
 fun ScanHistoryItem(
     scan: ScanResult,
-    onDelete: () -> Unit
+    onConfirmDelete: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -202,9 +239,9 @@ fun ScanHistoryItem(
             title = { Text("Delete Scan") },
             text = { Text("Are you sure you want to delete this scan?") },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
-                        onDelete()
+                        onConfirmDelete()
                         showDeleteDialog = false
                     }
                 ) {

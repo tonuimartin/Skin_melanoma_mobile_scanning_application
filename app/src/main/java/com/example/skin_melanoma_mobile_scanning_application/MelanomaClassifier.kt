@@ -3,6 +3,7 @@ package com.example.skin_melanoma_mobile_scanning_application
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.util.Log
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
 import java.nio.ByteBuffer
@@ -12,7 +13,7 @@ import java.nio.channels.FileChannel
 
 class MelanomaClassifier(private val context: Context) {
     private var interpreter: Interpreter? = null
-    private val modelPath = "app/src/main/assets/melanoma_classifier.tflite" // Replace with your model filename
+    private val modelPath = "melanoma_classifier.tflite" // Replace with your model filename
     private val imageSize = 224 // Change according to your model's input size
     private val PIXEL_SIZE = 3
     private val BATCH_SIZE = 1
@@ -29,18 +30,33 @@ class MelanomaClassifier(private val context: Context) {
             val tfliteModel = loadModelFile()
             val options = Interpreter.Options()
             interpreter = Interpreter(tfliteModel, options)
+
+            // Log model information
+            val inputShape = interpreter?.getInputTensor(0)?.shape()
+            val outputShape = interpreter?.getOutputTensor(0)?.shape()
+            Log.d("MelanomaClassifier", "Model Input Shape: ${inputShape?.contentToString()}")
+            Log.d("MelanomaClassifier", "Model Output Shape: ${outputShape?.contentToString()}")
+
+            Log.d("MelanomaClassifier", "Model loaded successfully")
         } catch (e: Exception) {
+            Log.e("MelanomaClassifier", "Error setting up interpreter: ${e.message}")
             e.printStackTrace()
         }
     }
 
     private fun loadModelFile(): MappedByteBuffer {
-        val fileDescriptor = context.assets.openFd(modelPath)
-        val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
-        val fileChannel = inputStream.channel
-        val startOffset = fileDescriptor.startOffset
-        val declaredLength = fileDescriptor.declaredLength
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+        try {
+            val assetFileDescriptor = context.assets.openFd(modelPath)
+            Log.d("MelanomaClassifier", "Model file found, size: ${assetFileDescriptor.length}")
+            val inputStream = FileInputStream(assetFileDescriptor.fileDescriptor)
+            val fileChannel = inputStream.channel
+            val startOffset = assetFileDescriptor.startOffset
+            val declaredLength = assetFileDescriptor.declaredLength
+            return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+        } catch (e: Exception) {
+            Log.e("MelanomaClassifier", "Error loading model file: ${e.message}")
+            throw e
+        }
     }
 
     private fun preprocessBitmap(bitmap: Bitmap): ByteBuffer {
@@ -71,25 +87,36 @@ class MelanomaClassifier(private val context: Context) {
     }
 
     fun classifyImage(bitmap: Bitmap): Pair<Boolean, Float> {
-        // Preprocess the image
-        val inputBuffer = preprocessBitmap(bitmap)
-
-        // Create output array (adjust size based on your model's output)
-        val outputBuffer = ByteBuffer.allocateDirect(4 * 2).apply { // 2 classes
-            order(ByteOrder.nativeOrder())
+        if (interpreter == null) {
+            Log.e("MelanomaClassifier", "Interpreter is null")
+            return Pair(false, 0.0f)
         }
-        val outputArray = Array(1) { FloatArray(2) }
 
         try {
-            // Run inference
-            interpreter?.run(inputBuffer, outputArray)
+            Log.d("MelanomaClassifier", "Starting image classification")
+            val inputBuffer = preprocessBitmap(bitmap)
+            val outputArray = Array(1) { FloatArray(1) } // Single output value
 
-            // Process results
-            val isMalignant = outputArray[0][1] > outputArray[0][0]
-            val confidence = if (isMalignant) outputArray[0][1] else outputArray[0][0]
+            // Get output tensor info
+            val outputTensor = interpreter?.getOutputTensor(0)
+            Log.d("MelanomaClassifier", "Output Tensor Shape: ${outputTensor?.shape()?.contentToString()}")
+            Log.d("MelanomaClassifier", "Output Tensor Type: ${outputTensor?.dataType()}")
 
-            return Pair(isMalignant, confidence)
+            try {
+                interpreter?.run(inputBuffer, outputArray)
+                val prediction = outputArray[0][0]
+                Log.d("MelanomaClassifier", "Raw prediction value: $prediction")
+
+                val isMalignant = prediction > 0.5f
+                val confidence = if (isMalignant) prediction else (1 - prediction)
+
+                return Pair(isMalignant, confidence)
+            } catch (e: Exception) {
+                Log.e("MelanomaClassifier", "Error during model inference: ${e.message}")
+                throw e
+            }
         } catch (e: Exception) {
+            Log.e("MelanomaClassifier", "Error classifying image: ${e.message}")
             e.printStackTrace()
             return Pair(false, 0.0f)
         }

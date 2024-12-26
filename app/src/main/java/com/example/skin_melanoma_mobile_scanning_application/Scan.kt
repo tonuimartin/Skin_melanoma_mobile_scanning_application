@@ -13,26 +13,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.*
+import android.widget.Toast
+import kotlinx.coroutines.tasks.await
 import java.util.*
-
-data class ScanResultData(
-    val id: String = UUID.randomUUID().toString(),
-    val userId: String = "",
-    val imageUrl: String = "",
-    val diagnosis: String = "",
-    val confidence: Float = 0f,
-    val timestamp: Date = Date(),
-    val isMalignant: Boolean = false
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,25 +30,42 @@ fun ScanResultScreen(
     imageUri: Uri,
     classification: Pair<Boolean, Float>
 ) {
-    var isLoading by remember { mutableStateOf(true) }
+    var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
+    val db = remember { FirebaseFirestore.getInstance() }
+    val auth = remember { FirebaseAuth.getInstance() }
 
-    LaunchedEffect(Unit) {
-        coroutineScope.launch {
+    DisposableEffect(Unit) {
+        val job = CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Call the non-composable function
-                uploadAndSaveScan(context, imageUri, classification) { success, message ->
-                    isLoading = false
-                    if (!success) {
-                        error = message
-                    }
-                }
+                val userId = auth.currentUser?.uid ?: throw Exception("User not logged in")
+                val scanId = UUID.randomUUID().toString()
+
+                val scanResult = ScanResult(
+                    id = scanId,
+                    userId = userId,
+                    imageUrl = "",
+                    diagnosis = if (classification.first) "Malignant" else "Benign",
+                    confidence = classification.second,
+                    timestamp = Date(),
+                    isMalignant = classification.first
+                )
+
+                db.collection("scans")
+                    .document(scanId)
+                    .set(scanResult)
+                    .await()
+
             } catch (e: Exception) {
-                isLoading = false
-                error = e.message
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Error saving scan: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
+        }
+
+        onDispose {
+            job.cancel()
         }
     }
 
@@ -80,110 +86,63 @@ fun ScanResultScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            } else {
-                Column(
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Image(
+                    painter = rememberAsyncImagePainter(imageUri),
+                    contentDescription = "Scanned image",
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .fillMaxWidth()
+                        .height(300.dp),
+                    contentScale = ContentScale.Fit
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Image(
-                        painter = rememberAsyncImagePainter(imageUri),
-                        contentDescription = "Scanned image",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp),
-                        contentScale = ContentScale.Fit
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = if (classification.first) "Malignant" else "Benign",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = if (classification.first) Color.Red else Color.Green
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = "Confidence: ${(classification.second * 100).toInt()}%",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                        }
-                    }
-
-                    if (error != null) {
-                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = error!!,
-                            color = Color.Red,
-                            style = MaterialTheme.typography.bodyMedium
+                            text = if (classification.first) "Malignant" else "Benign",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = if (classification.first) Color.Red else Color.Green
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "Confidence: ${(classification.second * 100).toInt()}%",
+                            style = MaterialTheme.typography.bodyLarge
                         )
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = error!!,
+                        color = Color.Red,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
 
-                    Button(
-                        onClick = { navController.navigate("history") },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("View Scan History")
-                    }
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = { navController.navigate("history") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("View Scan History")
                 }
             }
         }
-    }
-}
-
-// Separate non-composable function for Firebase operations
-private suspend fun uploadAndSaveScan(
-    context: Context,
-    imageUri: Uri,
-    classification: Pair<Boolean, Float>,
-    callback: (Boolean, String?) -> Unit
-) {
-    val auth = FirebaseAuth.getInstance()
-    val db = FirebaseFirestore.getInstance()
-
-    val userId = auth.currentUser?.uid ?: run {
-        callback(false, "User not logged in")
-        return
-    }
-
-    try {
-        val scanId = UUID.randomUUID().toString()
-
-        // Create scan result document without image URL
-        val scanResult = ScanResultData(
-            id = scanId,
-            userId = userId,
-            imageUrl = "", // Empty for now since we're not using Storage
-            diagnosis = if (classification.first) "Malignant" else "Benign",
-            confidence = classification.second,
-            timestamp = Date(),
-            isMalignant = classification.first
-        )
-
-        // Save to Firestore
-        db.collection("scans")
-            .document(scanId)
-            .set(scanResult)
-            .await()
-
-        callback(true, null)
-    } catch (e: Exception) {
-        callback(false, "Failed to save scan result: ${e.message}")
     }
 }
