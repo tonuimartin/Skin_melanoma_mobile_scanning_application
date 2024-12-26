@@ -1,5 +1,6 @@
 package com.example.skin_melanoma_mobile_scanning_application
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,6 +21,8 @@ import kotlinx.coroutines.delay
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.AnimatedVisibility
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,8 +67,30 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         composable("scan") {
             ScanScreen(navController)
         }
+        composable(
+            route = "scanResult/{imageUri}/{isMalignant}/{confidence}",
+            arguments = listOf(
+                navArgument("imageUri") { type = NavType.StringType },
+                navArgument("isMalignant") { type = NavType.BoolType },
+                navArgument("confidence") { type = NavType.FloatType }
+            )
+        ) { backStackEntry ->
+            val imageUri = Uri.parse(backStackEntry.arguments?.getString("imageUri"))
+            val isMalignant = backStackEntry.arguments?.getBoolean("isMalignant") ?: false
+            val confidence = backStackEntry.arguments?.getFloat("confidence") ?: 0f
+
+            ScanResultScreen(
+                navController = navController,
+                imageUri = imageUri,
+                classification = Pair(isMalignant, confidence)
+            )
+        }
         composable("history") {
-            // TODO: Implement history screen
+            ScanHistoryScreen(navController)
+        }
+
+        composable("image-preview") {
+            HomeScreen(navController)
         }
         composable("profile") {
             ProfileScreen(navController)

@@ -53,7 +53,7 @@ dependencies {
     implementation(libs.androidx.navigation.runtime.ktx)
     implementation(libs.firebase.firestore.ktx)
     // TensorFlow Lite
-    implementation("org.tensorflow:tensorflow-lite:2.14.0")
+    implementation(libs.tensorflow.tensorflow.lite.v2140)
 
     configurations.all {
         exclude(group = "com.google.ai.edge.litert", module = "litert-api")
@@ -62,12 +62,18 @@ dependencies {
     }
 
     // Camera dependencies
-    implementation("androidx.camera:camera-camera2:1.3.1")
-    implementation("androidx.camera:camera-lifecycle:1.3.1")
-    implementation("androidx.camera:camera-view:1.3.1")
+    implementation(libs.camera.camera2.v131)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.camera.view.v131)
+
+    implementation(libs.coil.compose)  // For basic Coil-Compose integration
+    implementation(libs.coil)         // For core Coil functionality
+
 
     implementation(libs.litert)
     implementation(libs.litert.support.api)
+    implementation(libs.firebase.storage.ktx)
+    implementation(libs.androidx.room.common)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
