@@ -1,7 +1,13 @@
 package com.example.skin_melanoma_mobile_scanning_application
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -19,7 +25,6 @@ import coil.compose.rememberAsyncImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.*
-import android.widget.Toast
 import kotlinx.coroutines.tasks.await
 import java.util.*
 
@@ -30,7 +35,6 @@ fun ScanResultScreen(
     imageUri: Uri,
     classification: Pair<Boolean, Float>
 ) {
-    var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val db = remember { FirebaseFirestore.getInstance() }
@@ -45,7 +49,7 @@ fun ScanResultScreen(
                 val scanResult = ScanResult(
                     id = scanId,
                     userId = userId,
-                    imageUrl = "",
+                    imageUrl = imageUri.toString(),
                     diagnosis = if (classification.first) "Malignant" else "Benign",
                     confidence = classification.second,
                     timestamp = Date(),
@@ -59,7 +63,8 @@ fun ScanResultScreen(
 
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Error saving scan: ${e.message}", Toast.LENGTH_LONG).show()
+                    error = "Error saving scan: ${e.message}"
+                    Toast.makeText(context, error, Toast.LENGTH_LONG).show()
                 }
             }
         }

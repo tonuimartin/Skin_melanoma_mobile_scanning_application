@@ -25,11 +25,43 @@ fun RegistrationScreen(navController: NavController) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    var showVerificationDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
     val scope = rememberCoroutineScope()
+
+    if (showVerificationDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                auth.signOut()
+                showVerificationDialog = false
+                isLoading = false
+                navController.navigate("login") {
+                    popUpTo("registration") { inclusive = true }
+                }
+            },
+            title = { Text("Verification Required") },
+            text = {
+                Text("A verification link has been sent to your email address. Please verify your email to complete registration.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        auth.signOut()
+                        showVerificationDialog = false
+                        isLoading = false
+                        navController.navigate("login") {
+                            popUpTo("registration") { inclusive = true }
+                        }
+                    }
+                ) {
+                    Text("OK")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -81,96 +113,103 @@ fun RegistrationScreen(navController: NavController) {
                 .padding(bottom = 24.dp)
         )
 
-        if (isLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier.padding(16.dp)
-            )
-        } else {
-            Button(
-                onClick = {
-                    if (email.isNotBlank() && password.isNotBlank() &&
-                        firstName.isNotBlank() && lastName.isNotBlank()
-                    ) {
-                        isLoading = true
-                        val cleanEmail = email.trim().lowercase()
+        Button(
+            onClick = {
+                if (email.isNotBlank() && password.isNotBlank() &&
+                    firstName.isNotBlank() && lastName.isNotBlank()
+                ) {
+                    isLoading = true
+                    val cleanEmail = email.trim().lowercase()
 
-                        scope.launch {
-                            try {
-                                withContext(Dispatchers.IO) {
-                                    auth.createUserWithEmailAndPassword(cleanEmail, password)
+                    scope.launch {
+                        try {
+                            withContext(Dispatchers.IO) {
+                                // Create the user account temporarily
+                                auth.createUserWithEmailAndPassword(cleanEmail, password)
+                                    .await()
+
+                                // Send verification email
+                                auth.currentUser?.sendEmailVerification()?.await()
+
+                                // Store user data temporarily
+                                val userId = auth.currentUser?.uid
+                                if (userId != null) {
+                                    val user = hashMapOf(
+                                        "firstName" to firstName.trim(),
+                                        "lastName" to lastName.trim(),
+                                        "email" to cleanEmail,
+                                        "isEmailVerified" to false,
+                                        "tempAccount" to true
+                                    )
+
+                                    db.collection("users")
+                                        .document(userId)
+                                        .set(user)
                                         .await()
-
-                                    val userId = auth.currentUser?.uid
-                                    if (userId != null) {
-                                        val user = hashMapOf(
-                                            "firstName" to firstName.trim(),
-                                            "lastName" to lastName.trim(),
-                                            "email" to cleanEmail
-                                        )
-
-                                        db.collection("users")
-                                            .document(userId)
-                                            .set(user)
-                                            .await()
-                                    }
-                                }
-
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(
-                                        context,
-                                        "Registration successful!",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                    navController.navigate("login") {
-                                        popUpTo("registration") { inclusive = true }
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(
-                                        context,
-                                        "Registration failed: ${e.message}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                    isLoading = false
                                 }
                             }
-                        }
-                    } else {
-                        Toast.makeText(
-                            context,
-                            "Please fill all fields",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                enabled = !isLoading
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary)
-                } else {
-                    Text("Register")
-                }
-            }
-          }
 
-            Row(
-                modifier = Modifier.padding(top = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Already have an account?")
-                TextButton(
-                    onClick = {
-                        navController.navigate("login") {
-                            popUpTo("registration") { inclusive = true }
+                            withContext(Dispatchers.Main) {
+                                auth.signOut()
+                                Toast.makeText(
+                                    context,
+                                    "Registration successful! Please check your email for verification.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                // Navigate to login screen immediately
+                                navController.navigate("login") {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(
+                                    context,
+                                    "Registration failed: ${e.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                isLoading = false
+                            }
                         }
                     }
-                ) {
-                    Text("Login")
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Please fill all fields",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            enabled = !isLoading
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
+                Text("Register")
+            }
+        }
+
+        Row(
+            modifier = Modifier.padding(top = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Already have an account?")
+            TextButton(
+                onClick = {
+                    navController.navigate("login") {
+                        popUpTo("registration") { inclusive = true }
+                    }
+                }
+            ) {
+                Text("Login")
             }
         }
     }
+}

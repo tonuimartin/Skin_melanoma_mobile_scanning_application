@@ -9,5 +9,8 @@ data class ScanResult(
     val diagnosis: String = "",
     val confidence: Float = 0f,
     val timestamp: Date = Date(),
-    val isMalignant: Boolean = false
+    val isMalignant: Boolean = false,
+    val processingTimeMs: Long = 0,
+    val modelVersion: String = "",
+    val rawProbabilities: List<Float> = emptyList()
 )
