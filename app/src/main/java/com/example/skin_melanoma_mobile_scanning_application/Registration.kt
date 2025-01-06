@@ -124,7 +124,7 @@ fun RegistrationScreen(navController: NavController) {
                     scope.launch {
                         try {
                             withContext(Dispatchers.IO) {
-                                // Create the user account temporarily
+                                // Create user account temporarily
                                 auth.createUserWithEmailAndPassword(cleanEmail, password)
                                     .await()
 
@@ -157,7 +157,6 @@ fun RegistrationScreen(navController: NavController) {
                                     Toast.LENGTH_LONG
                                 ).show()
 
-                                // Navigate to login screen immediately
                                 navController.navigate("login") {
                                     popUpTo(0) { inclusive = true }
                                 }

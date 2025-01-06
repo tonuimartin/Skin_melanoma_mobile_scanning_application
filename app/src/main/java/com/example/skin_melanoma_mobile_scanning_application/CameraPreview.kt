@@ -103,7 +103,7 @@ fun CameraPreview(
 
             preview.setSurfaceProvider(previewView?.surfaceProvider)
         } catch (e: Exception) {
-            //onError(ImageCaptureException("Failed to bind camera use cases", e))
+
         }
     }
 }

@@ -99,7 +99,6 @@ fun HomeScreen(navController: NavController) {
             // Scan Button
             ElevatedButton(
                 onClick = {
-                    // TODO: Navigate to scan screen
                     navController.navigate("scan")
                 },
                 modifier = Modifier
@@ -118,7 +117,6 @@ fun HomeScreen(navController: NavController) {
             // History Button
             OutlinedButton(
                 onClick = {
-                    // TODO: Navigate to history screen
                     navController.navigate("history")
                 },
                 modifier = Modifier
@@ -137,7 +135,6 @@ fun HomeScreen(navController: NavController) {
             // Profile Button
             OutlinedButton(
                 onClick = {
-                    // TODO: Navigate to profile screen
                     navController.navigate("profile")
                 },
                 modifier = Modifier

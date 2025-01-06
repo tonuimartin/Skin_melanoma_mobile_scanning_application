@@ -15,7 +15,7 @@ class MelanomaClassifier(private val context: Context) {
     private val modelPath = "melanoma_classifier.tflite"
     private var inputImageWidth = 0
     private var inputImageHeight = 0
-    private var inputImageChannels = 3 // Assuming RGB image
+    private var inputImageChannels = 3
 
     companion object {
         const val MODEL_VERSION = "1.0"
@@ -80,7 +80,7 @@ class MelanomaClassifier(private val context: Context) {
 
         try {
             val inputBuffer = preprocessBitmap(bitmap)
-            val outputBuffer = ByteBuffer.allocateDirect(4) // Assuming single float output
+            val outputBuffer = ByteBuffer.allocateDirect(4)
             outputBuffer.order(ByteOrder.nativeOrder())
 
             interpreter?.run(inputBuffer, outputBuffer)

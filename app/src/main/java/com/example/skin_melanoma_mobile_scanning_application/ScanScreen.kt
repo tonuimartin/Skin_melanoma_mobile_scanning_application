@@ -40,7 +40,7 @@ fun ScanScreen(navController: NavController) {
     val classifier = remember { MelanomaClassifier(context) }
     var isProcessing by remember { mutableStateOf(false) }
 
-    // Image picker launcher
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -113,7 +113,7 @@ fun ScanScreen(navController: NavController) {
                 showCamera = false
             },
             onError = { exception ->
-                // Handle error
+
                 Log.e("CameraPreview", "Error capturing image", exception)
             },
             onClose = {
@@ -161,7 +161,7 @@ fun ScanScreen(navController: NavController) {
                 }
             )
         } else {
-            // Show loading indicator while processing
+
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center

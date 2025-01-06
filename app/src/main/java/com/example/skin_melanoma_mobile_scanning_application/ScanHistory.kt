@@ -62,12 +62,11 @@ fun ScanHistoryScreen(navController: NavController) {
             deleteJob.value?.cancel()
             deleteJob.value = CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    // Remove from local state immediately
+
                     withContext(Dispatchers.Main) {
                         scans = scans.filter { it.id != scan.id }
                     }
 
-                    // Delete from Firebase
                     db.collection("scans")
                         .document(scan.id)
                         .delete()
@@ -77,7 +76,6 @@ fun ScanHistoryScreen(navController: NavController) {
                         Toast.makeText(context, "Scan deleted successfully", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
-                    // If delete fails, refresh the list to restore state
                     withContext(Dispatchers.Main) {
                         scans = fetchScans()
                         Toast.makeText(context, "Failed to delete scan: ${e.message}", Toast.LENGTH_LONG).show()
@@ -93,7 +91,6 @@ fun ScanHistoryScreen(navController: NavController) {
         }
     }
 
-    // Initial fetch of scans
     LaunchedEffect(Unit) {
         try {
             scans = fetchScans()

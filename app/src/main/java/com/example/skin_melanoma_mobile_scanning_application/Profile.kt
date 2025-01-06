@@ -30,7 +30,6 @@ fun ProfileScreen(navController: NavController) {
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
 
-    // Fetch user data
     LaunchedEffect(Unit) {
         try {
             val userId = auth.currentUser?.uid

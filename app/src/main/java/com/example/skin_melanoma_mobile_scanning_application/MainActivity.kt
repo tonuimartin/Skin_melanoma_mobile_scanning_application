@@ -63,7 +63,6 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         composable("home") {
             HomeScreen(navController)
         }
-        // These routes will be implemented later
         composable("scan") {
             ScanScreen(navController)
         }
@@ -103,7 +102,7 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
     var visible by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
-        delay(2000) // Show splash for 2 seconds
+        delay(2000)
         visible = false
         onSplashComplete()
     }
