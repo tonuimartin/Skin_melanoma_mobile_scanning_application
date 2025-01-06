@@ -165,7 +165,6 @@ The app integrates a TensorFlow Lite model converted from the main melanoma clas
 - Secure password storage
 - Firebase Authentication integration
 - User-specific data isolation
-- Secure image storage
 
 ## Performance Considerations
 
